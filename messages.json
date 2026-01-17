@@ -1,0 +1,12 @@
+{
+    "en": {
+        "welcome_new": "Hello {name}! 🌟 Welcome to the bot for the <b>first time</b>. Use /help to see what I can do.",
+        "help": "Help\nUse /start to start the bot. Use /stop to stop the bot. Use /language to change the language.",
+        "welcome_back": "Welcome back, {name}! Good to see you again. Ready to continue?"
+    },
+    "es": {
+        "welcome_new": "¡Hola {name}! 🌟 Bienvenido al bot por <b>primera vez</b>.",
+        "welcome_back": "¡Hola de nuevo, {name}! ¿Listo para continuar?",
+        "help": "Bienvenido a la página de ayuda\nUse /start para iniciar el bot. Use /stop para detener el bot. Use /language para cambiar el idioma."
+    }
+}

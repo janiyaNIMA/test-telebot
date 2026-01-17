@@ -1,44 +1,47 @@
-import telebot
-import requests
+from dotenv import load_dotenv
+import os
+import logging
+from telegram import ForceReply, Update
+from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 
-API_TOKEN = '6463336436:AAGyGh-ANYPjMDqRLkIsCS5LjOurXvJAqDs'
-bot = telebot.TeleBot(API_TOKEN)
+# Load environment variables from .env file
+load_dotenv()
+API_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
 
-# Dictionary to store user states
-user_states = {}
+# Enable logging
+logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-@bot.message_handler(commands=['start'])
-def start(message):
-    bot.reply_to(message, "Hey..! How's it going? Type /weather to get weather information.")
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Send a message when the command /start is issued."""
+    user = update.effective_user
+    await update.message.reply_html(
+        rf"Hi {user.mention_html()}!",
+        reply_markup=ForceReply(selective=True),
+    )
 
-@bot.message_handler(commands=['weather'])
-def ask_location(message):
-    chat_id = message.chat.id
-    user_states[chat_id] = 'waiting_for_location'
-    bot.reply_to(message, "Please provide the location for which you want the weather information.")
+async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Send a message when the command /help is issued."""
+    await update.message.reply_text('Help!')
 
-@bot.message_handler(func=lambda message: user_states.get(message.chat.id) == 'waiting_for_location')
-def get_weather(message):
-    chat_id = message.chat.id
-    city = message.text
-    API_key = 'b8a0131cac0cc7e9d7b6ba1c386f8f26'
-    units = 'metric'
-    url = f'https://api.openweathermap.org/data/2.5/weather?q={city}&appid={API_key}&units={units}'
-    
-    resp = requests.get(url)
-    if resp.status_code == 200:
-        msg = resp.json()
-        reply = f'''
-        <b>{msg['name']}</b>
-        Temp: {msg['main']['temp']}°C
-        Pressure: {msg['main']['pressure']} hPa
-        Humidity: {msg['main']['humidity']}%
-        Wind Speed: {msg['wind']['speed']} m/s
-        '''
-    else:
-        reply = f"Sorry, I couldn't find the weather for {city}. Please check the city name and try again."
-    
-    bot.reply_to(message, reply, parse_mode='html')
-    user_states[chat_id] = None  # Reset the user state
+async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Echo the user message."""
+    await update.message.reply_text(update.message.text)
 
-bot.polling()
+def main() -> None:
+    """Start the bot."""
+    # Create the Application and pass it your bot's token.
+    application = Application.builder().token(API_TOKEN).build()
+
+    # on different commands - answer in Telegram
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(CommandHandler("help", help_command))
+
+    # on non command i.e message - echo the message on Telegram
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, echo))
+
+    # Run the bot until you press Ctrl-C
+    application.run_polling(allowed_updates=Update.ALL_TYPES)
+
+if __name__ == '__main__':
+    main()

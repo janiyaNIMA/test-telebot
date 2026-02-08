@@ -1,11 +1,37 @@
 import json
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
-from database import get_user_language, check_and_register_user, update_user_language
+from database import get_user_language, check_and_register_user, update_user_language, get_setting, is_admin_in_db, is_user_banned
+import os
 
 # Load messages from JSON file
 with open('messages.json', 'r', encoding='utf-8') as f:
     messages = json.load(f)
+
+# For security, you should add ADMIN_ID to your .env file
+ADMIN_ID = os.getenv('ADMIN_ID')
+if ADMIN_ID:
+    ADMIN_ID = int(ADMIN_ID)
+
+async def is_admin(user_id):
+    """Check if a user is an admin from the database or environment."""
+    # Check environment ADMIN_ID first
+    if ADMIN_ID and user_id == ADMIN_ID:
+        return True
+    # Check database
+    return await is_admin_in_db(user_id)
+
+async def is_bot_disabled(user_id):
+    """Check if bot is disabled for this user or if user is banned."""
+    # Check if user is banned first
+    if await is_user_banned(user_id):
+        return True
+        
+    bot_disabled = await get_setting("bot_disabled", "false")
+    if bot_disabled == "true":
+        # Check if user is admin - admins can always use the bot
+        return not await is_admin(user_id)
+    return False
 
 def get_message(lang_code: str, key: str, default: str = "Message not found.") -> str:
     """Safely retrieves a message from the loaded JSON data, with fallbacks."""
@@ -14,6 +40,12 @@ def get_message(lang_code: str, key: str, default: str = "Message not found.") -
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handles the /start command."""
     user = update.effective_user
+    
+    # Check if bot is disabled for this user
+    if await is_bot_disabled(user.id):
+        await update.message.reply_text("🛑 The bot is currently disabled for regular users.")
+        return
+    
     is_new = await check_and_register_user(user)
     
     msg_key = 'welcome_new' if is_new else 'welcome_back'
@@ -26,6 +58,12 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handles the /help command."""
     user = update.effective_user
+    
+    # Check if bot is disabled for this user
+    if await is_bot_disabled(user.id):
+        await update.message.reply_text("🛑 The bot is currently disabled for regular users.")
+        return
+    
     lang = await get_user_language(user.id)
     text = get_message(lang, 'help')
     await update.message.reply_html(text=text)
@@ -33,6 +71,12 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 async def show_languages(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Shows a keyboard for language selection."""
     user = update.effective_user
+    
+    # Check if bot is disabled for this user
+    if await is_bot_disabled(user.id):
+        await update.message.reply_text("🛑 The bot is currently disabled for regular users.")
+        return
+    
     lang = await get_user_language(user.id)
     text = get_message(lang, 'language_select')
     
@@ -62,6 +106,12 @@ async def set_language(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 async def unknown_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handles messages that aren't recognized commands."""
     user = update.effective_user
+    
+    # Check if bot is disabled for this user
+    if await is_bot_disabled(user.id):
+        await update.message.reply_text("🛑 The bot is currently disabled for regular users.")
+        return
+    
     lang = await get_user_language(user.id)
     text = get_message(lang, 'unknown_command')
     await update.message.reply_html(text)

@@ -4,7 +4,7 @@ import logging
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, CallbackQueryHandler, ConversationHandler
 
-from database import init_db
+from database import init_db, get_setting
 import commands
 import remote_control
 import admin
@@ -25,6 +25,7 @@ async def post_init(application: Application) -> None:
         ("remote", "Open Interactive Control Panel"),
         ("help", "Show all commands"),
         ("broadcast", "Admin: Broadcast message (Admins only)"),
+        ("sudo", "Admin: Execute sudo commands (Admins only)"),
     ])
 
 def main() -> None:
@@ -39,6 +40,7 @@ def main() -> None:
     broadcast_handler = ConversationHandler(
         entry_points=[CommandHandler("broadcast", admin.broadcast_start)],
         states={
+            admin.SELECT_TARGET: [CallbackQueryHandler(admin.receive_target, pattern="^target_")],
             admin.SELECT_FILE: [MessageHandler(filters.ALL & ~filters.COMMAND, admin.receive_file)],
             admin.GET_CAPTION: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, admin.receive_caption),
@@ -55,10 +57,14 @@ def main() -> None:
     application.add_handler(CommandHandler("help", commands.help_command))
     application.add_handler(CommandHandler("language", commands.show_languages))
     application.add_handler(CommandHandler("remote", remote_control.remote_control_panel))
+    application.add_handler(CommandHandler("sudo", admin.sudo_command))
     
     # Register callback handlers
     application.add_handler(CallbackQueryHandler(remote_control.remote_callback_handler, pattern="^(rc_|lang_)"))
     application.add_handler(CallbackQueryHandler(commands.set_language, pattern="^(en|es|ta)$"))
+    
+    # Register relay handler for admins (must be before unknown_command)
+    application.add_handler(MessageHandler(filters.ALL & ~filters.COMMAND, admin.relay_handler))
     
     # Register message handler for unknown input
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, commands.unknown_command))
